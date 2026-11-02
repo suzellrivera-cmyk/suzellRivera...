@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Play, BookOpen, ChevronDown, ChevronRight, Terminal, Code2, Lightbulb, RotateCcw, CheckCircle2, XCircle, AlertTriangle, Sparkles, Copy, Check } from 'lucide-react';
 import { runProlog, PrologResult, TraceStep } from './prolog';
+import { Robot, RobotMood } from './components/Robot';
 
 interface Example {
   title: string;
@@ -9,6 +10,45 @@ interface Example {
 }
 
 const EXAMPLES: Example[] = [
+  {
+    title: 'Avanzar',
+    description: 'El robot avanza una posición',
+    code: `accion(avanzar).
+
+?- accion(avanzar).`,
+  },
+  {
+    title: 'Girar',
+    description: 'El robot gira a la izquierda o derecha',
+    code: `accion(girar_izquierda).
+accion(girar_derecha).
+
+?- accion(girar_derecha).`,
+  },
+  {
+    title: 'Secuencia de movimientos',
+    description: 'El robot ejecuta una rutina de varios pasos',
+    code: `paso(avanzar).
+paso(girar_izquierda).
+paso(avanzar).
+paso(girar_derecha).
+paso(retroceder).
+
+rutina(P) :- paso(P).
+
+?- rutina(P).`,
+  },
+  {
+    title: 'Saltar obstaculo',
+    description: 'El robot decide si saltar segun el obstaculo',
+    code: `obstaculo(piedra).
+obstaculo(roca).
+obstaculo(hueco).
+
+saltar(X) :- obstaculo(X).
+
+?- saltar(piedra).`,
+  },
   {
     title: 'Miembro de una lista',
     description: 'Verifica si un elemento pertenece a una lista',
@@ -36,41 +76,6 @@ factorial(N, R) :- N > 0, N1 is N - 1, factorial(N1, R1), R is N * R1.
 ?- factorial(5, R).`,
   },
   {
-    title: 'Negación como fallo',
-    description: 'Usa \\+ para negar un objetivo',
-    code: `estudiante(ana).
-estudiante(beto).
-estudiante(carla).
-
-profesor(david).
-
-noEstudiante(X) :- \\+ estudiante(X).
-
-?- noEstudiante(david).
-?- noEstudiante(ana).`,
-  },
-  {
-    title: 'Disyunción y corte',
-    description: 'Usa ; para alternativas y ! para corte',
-    code: `clasificar(N, positivo) :- N > 0, !.
-clasificar(0, cero) :- !.
-clasificar(N, negativo) :- N < 0.
-
-max(X, Y, X) :- X >= Y, !.
-max(X, Y, Y).
-
-?- clasificar(5, C).
-?- max(7, 3, M).`,
-  },
-  {
-    title: 'Longitud de lista',
-    description: 'Calcula la longitud de una lista recursivamente',
-    code: `longitud([], 0).
-longitud([_|T], N) :- longitud(T, N1), N is N1 + 1.
-
-?- longitud([a,b,c,d], N).`,
-  },
-  {
     title: 'Ancestro / descendiente',
     description: 'Recursividad con hechos y reglas',
     code: `padre(abraham, isaac).
@@ -83,20 +88,9 @@ ancestro(X, Y) :- padre(X, Z), ancestro(Z, Y).
 ?- ancestro(abraham, juda).
 ?- ancestro(abraham, X).`,
   },
-  {
-    title: 'Unificación con variables',
-    description: 'Explora múltiples soluciones',
-    code: `color(rojo).
-color(verde).
-color(azul).
-
-mezcla(A, B) :- color(A), color(B).
-
-?- mezcla(X, Y).`,
-  },
 ];
 
-type Tab = 'result' | 'trace' | 'parsed';
+type Tab = 'result' | 'trace' | 'robot';
 
 function TraceTreeView({ steps }: { steps: TraceStep[] }) {
   return (
@@ -134,6 +128,30 @@ function TraceTreeView({ steps }: { steps: TraceStep[] }) {
   );
 }
 
+const MOVIMIENTOS = ['avanzar', 'girar_izquierda', 'girar_derecha', 'retroceder', 'saltar'] as const;
+type Movimiento = (typeof MOVIMIENTOS)[number];
+
+function detectarMovimientos(result: PrologResult | null): Movimiento[] {
+  if (!result || result.error) return [];
+  const movs: Movimiento[] = [];
+  const revisar = (texto: string) => {
+    const lower = texto.toLowerCase();
+    MOVIMIENTOS.forEach((m) => {
+      if (lower.includes(m)) {
+        movs.push(m);
+      }
+    });
+  };
+  if (result.answer) revisar(result.answer);
+  result.solutions.forEach((sol) => {
+    sol.forEach((v, k) => {
+      revisar(k);
+      revisar(v);
+    });
+  });
+  return movs;
+}
+
 function App() {
   const [input, setInput] = useState<string>(EXAMPLES[0].code);
   const [result, setResult] = useState<PrologResult | null>(null);
@@ -142,6 +160,8 @@ function App() {
   const [allSolutions, setAllSolutions] = useState(false);
   const [showExamples, setShowExamples] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [robotMood, setRobotMood] = useState<RobotMood>('idle');
+  const [robotSeq, setRobotSeq] = useState<Movimiento[]>([]);
   const traceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -150,19 +170,40 @@ function App() {
     }
   }, [tab, result]);
 
+  useEffect(() => {
+    if (result) {
+      const movs = detectarMovimientos(result);
+      setRobotSeq(movs);
+      if (result.error) {
+        setRobotMood('error');
+      } else if (movs.length > 0) {
+        setRobotMood('happy');
+      } else if (result.success) {
+        setRobotMood('happy');
+      } else {
+        setRobotMood('sad');
+      }
+      setTimeout(() => setRobotMood('idle'), 3000);
+    }
+  }, [result]);
+
   const handleRun = useCallback(() => {
     setLoading(true);
-    setTab('result');
+    setTab('robot');
+    setRobotMood('thinking');
+    setRobotSeq([]);
     setTimeout(() => {
       const res = runProlog(input, { allSolutions });
       setResult(res);
       setLoading(false);
-    }, 50);
+    }, 800);
   }, [input, allSolutions]);
 
   const handleExample = (ex: Example) => {
     setInput(ex.code);
     setResult(null);
+    setRobotMood('idle');
+    setRobotSeq([]);
   };
 
   const handleCopyResult = () => {
@@ -172,8 +213,6 @@ function App() {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
-
-  const hasVars = result && result.solutions.length > 0 && result.solutions[0].size > 0;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
@@ -250,7 +289,7 @@ function App() {
                   Código Prolog + Consulta
                 </span>
                 <button
-                  onClick={() => { setInput(''); setResult(null); }}
+                  onClick={() => { setInput(''); setResult(null); setRobotMood('idle'); setRobotSeq([]); }}
                   className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -286,7 +325,7 @@ function App() {
                   className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 text-white text-sm font-medium shadow-lg shadow-sky-500/20 hover:shadow-sky-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:hover:scale-100 disabled:shadow-none"
                 >
                   <Play className="w-4 h-4" />
-                  Evaluar
+                  Ejecutar
                 </button>
               </div>
             </div>
@@ -298,7 +337,8 @@ function App() {
             <div className="flex flex-col flex-1 rounded-2xl border border-slate-800 bg-slate-900/50 overflow-hidden">
               <div className="flex items-center gap-1 px-2 py-2 border-b border-slate-800 bg-slate-900/80">
                 {([
-                  { id: 'result' as Tab, label: 'Respuesta', icon: Sparkles },
+                  { id: 'robot' as Tab, label: 'Robot', icon: Sparkles },
+                  { id: 'result' as Tab, label: 'Respuesta', icon: CheckCircle2 },
                   { id: 'trace' as Tab, label: 'Traza', icon: Terminal },
                 ]).map((t) => (
                   <button
@@ -314,7 +354,7 @@ function App() {
                     {t.label}
                   </button>
                 ))}
-                {result && (
+                {result && tab !== 'robot' && (
                   <button
                     onClick={handleCopyResult}
                     className="ml-auto flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 transition-colors"
@@ -327,17 +367,47 @@ function App() {
 
               {/* Content */}
               <div className="flex-1 overflow-auto p-4 min-h-[300px] lg:min-h-0">
-                {!result && !loading && (
+                {/* Robot tab */}
+                {tab === 'robot' && (
+                  <div className="h-full flex flex-col items-center justify-center gap-6 py-4">
+                    <div className="robot-arena">
+                      <Robot mood={loading ? 'thinking' : robotMood} />
+                    </div>
+                    {robotSeq.length > 0 && (
+                      <div className="flex flex-wrap justify-center gap-2 max-w-sm">
+                        {robotSeq.map((m, i) => (
+                          <span
+                            key={i}
+                            className="px-3 py-1 rounded-lg bg-sky-900/40 border border-sky-700/40 text-xs text-sky-200 font-mono animate-pop"
+                            style={{ animationDelay: `${i * 200}ms` }}
+                          >
+                            {m.replace('_', ' ')}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {!loading && !result && (
+                      <p className="text-slate-500 text-sm text-center">
+                        Presiona <span className="text-sky-400 font-medium">Ejecutar</span> para ver al robot moverse.
+                      </p>
+                    )}
+                    {loading && (
+                      <p className="text-sky-300 text-sm animate-pulse">El robot está procesando...</p>
+                    )}
+                  </div>
+                )}
+
+                {!loading && !result && tab !== 'robot' && (
                   <div className="h-full flex flex-col items-center justify-center text-center py-12">
                     <div className="w-16 h-16 rounded-2xl bg-slate-800/60 flex items-center justify-center mb-4">
                       <Terminal className="w-8 h-8 text-slate-600" />
                     </div>
-                    <p className="text-slate-500 text-sm">Presiona <span className="text-sky-400 font-medium">Evaluar</span> para ver el resultado</p>
+                    <p className="text-slate-500 text-sm">Presiona <span className="text-sky-400 font-medium">Ejecutar</span> para ver el resultado</p>
                     <p className="text-slate-600 text-xs mt-1">o usa Ctrl+Enter</p>
                   </div>
                 )}
 
-                {loading && (
+                {loading && tab !== 'robot' && (
                   <div className="h-full flex items-center justify-center">
                     <div className="w-8 h-8 border-2 border-sky-500/30 border-t-sky-500 rounded-full animate-spin" />
                   </div>
@@ -399,16 +469,6 @@ function App() {
                         ))}
                       </div>
                     )}
-
-                    {/* Explanation */}
-                    {result.trace.length > 0 && !result.error && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Explicación</p>
-                        <div className="p-3 rounded-xl bg-slate-800/40 border border-slate-800 text-sm text-slate-400 space-y-1.5">
-                          {generateExplanation(result)}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -435,91 +495,6 @@ function App() {
         </div>
       </footer>
     </div>
-  );
-}
-
-function generateExplanation(result: PrologResult): React.ReactNode {
-  if (result.trace.length === 0) return null;
-
-  const lines: string[] = [];
-  const steps = result.trace;
-
-  const callSteps = steps.filter((s) => s.type === 'call');
-  const trySteps = steps.filter((s) => s.type === 'try');
-  const successSteps = steps.filter((s) => s.type === 'success');
-  const failSteps = steps.filter((s) => s.type === 'fail');
-  const cutSteps = steps.filter((s) => s.type === 'info' && s.message.includes('corte'));
-
-  if (result.error) return null;
-
-  if (result.success) {
-    lines.push(`La consulta fue exitosa (${result.answer}).`);
-  } else {
-    lines.push(`La consulta falló (false).`);
-  }
-
-  lines.push('');
-
-  const clauseAttempts = trySteps.filter((s) => s.message.startsWith('Probando cláusula'));
-  if (clauseAttempts.length > 0) {
-    const successes = steps.filter((s) => s.type === 'success' && s.message.includes('unifica'));
-    const fails = steps.filter((s) => s.type === 'fail' && s.message.includes('no unifica'));
-
-    if (successes.length > 0 && fails.length > 0) {
-      lines.push(`Se intentaron ${clauseAttempts.length} cláusula(s): ${fails.length} no unificaron y ${successes.length} sí unificaron con éxito.`);
-    } else if (successes.length > 0) {
-      lines.push(`Se intentaron ${clauseAttempts.length} cláusula(s) y todas las necesarias unificaron con éxito.`);
-    } else if (fails.length > 0) {
-      lines.push(`Se intentaron ${clauseAttempts.length} cláusula(s) pero ninguna unificó.`);
-    }
-  }
-
-  const negSteps = steps.filter((s) => s.message.includes('\\+'));
-  if (negSteps.length > 0) {
-    const negSuccess = negSteps.some((s) => s.type === 'success');
-    const negFail = negSteps.some((s) => s.type === 'fail');
-    if (negSuccess) {
-      lines.push(`La negación como fallo (\\+) tuvo éxito: el objetivo negado no es demostrable.`);
-    } else if (negFail) {
-      lines.push(`La negación como fallo (\\+) falló: el objetivo negado sí es demostrable.`);
-    }
-  }
-
-  const disjSteps = steps.filter((s) => s.message.includes('disyunción'));
-  if (disjSteps.length > 0) {
-    lines.push(`Se evaluó una disyunción (;), probando alternativas.`);
-  }
-
-  if (cutSteps.length > 0) {
-    lines.push(`Se aplicó el corte (!): se eliminan las alternativas restantes para el predicado.`);
-  }
-
-  const arithSteps = steps.filter((s) => s.message.startsWith('is:'));
-  if (arithSteps.length > 0) {
-    const arithSuccess = arithSteps.filter((s) => s.type === 'success');
-    lines.push(`Se evaluaron ${arithSteps.length} expresión(es) aritmética(s)${arithSuccess.length === arithSteps.length ? ', todas con éxito' : ''}.`);
-  }
-
-  const compareSteps = steps.filter((s) => s.message.match(/^[<>=]/) && s.message.includes('→'));
-  if (compareSteps.length > 0) {
-    const compareSuccess = compareSteps.filter((s) => s.type === 'success');
-    const compareFail = compareSteps.filter((s) => s.type === 'fail');
-    lines.push(`Se realizaron ${compareSteps.length} comparación(es) aritmética(s): ${compareSuccess.length} verdadera(s), ${compareFail.length} falsa(s).`);
-  }
-
-  lines.push('');
-  lines.push(`Total: ${callSteps.length} llamada(s), ${trySteps.length} intento(s) de cláusula, ${successSteps.length} éxito(s), ${failSteps.length} fallo(s).`);
-
-  if (result.solutions.length > 1) {
-    lines.push(`Se encontraron ${result.solutions.length} soluciones distintas para las variables de la consulta.`);
-  }
-
-  return (
-    <>
-      {lines.map((line, i) => (
-        <p key={i} className={line === '' ? 'h-2' : ''}>{line}</p>
-      ))}
-    </>
   );
 }
 
