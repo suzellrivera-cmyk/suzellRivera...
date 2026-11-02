@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Play, BookOpen, ChevronDown, ChevronRight, Terminal, Code2, Lightbulb, RotateCcw, CheckCircle2, XCircle, AlertTriangle, Sparkles, Copy, Check } from 'lucide-react';
+import { Play, BookOpen, ChevronDown, ChevronRight, Terminal, Code2, Lightbulb, RotateCcw, CheckCircle2, XCircle, AlertTriangle, Sparkles, Copy, Check, Bot } from 'lucide-react';
 import { runProlog, PrologResult, TraceStep } from './prolog';
-import { Robot, RobotMood } from './components/Robot';
+import { Robot, RobotMood, Movimiento, MOVE_DURATION, moveLabel, moveIcon } from './components/Robot';
 
 interface Example {
   title: string;
@@ -18,36 +18,45 @@ const EXAMPLES: Example[] = [
 ?- accion(avanzar).`,
   },
   {
-    title: 'Girar',
-    description: 'El robot gira a la izquierda o derecha',
-    code: `accion(girar_izquierda).
-accion(girar_derecha).
+    title: 'Girar a la derecha',
+    description: 'El robot gira en su lugar',
+    code: `accion(girar_derecha).
 
 ?- accion(girar_derecha).`,
   },
   {
-    title: 'Secuencia de movimientos',
-    description: 'El robot ejecuta una rutina de varios pasos',
-    code: `paso(avanzar).
-paso(girar_izquierda).
-paso(avanzar).
-paso(girar_derecha).
-paso(retroceder).
+    title: 'Rutina de movimientos',
+    description: 'Secuencia: avanzar, girar, avanzar, saltar',
+    code: `paso(1, avanzar).
+paso(2, girar_derecha).
+paso(3, avanzar).
+paso(4, saltar).
+paso(5, retroceder).
 
-rutina(P) :- paso(P).
+rutina(N, P) :- paso(N, P).
 
-?- rutina(P).`,
+?- rutina(N, P).`,
   },
   {
-    title: 'Saltar obstaculo',
-    description: 'El robot decide si saltar segun el obstaculo',
+    title: 'Saltar obstáculo',
+    description: 'El robot salta si encuentra un obstáculo',
     code: `obstaculo(piedra).
 obstaculo(roca).
-obstaculo(hueco).
 
 saltar(X) :- obstaculo(X).
 
 ?- saltar(piedra).`,
+  },
+  {
+    title: 'Evitar pared',
+    description: 'El robot gira si hay una pared adelante',
+    code: `pared(frente).
+libre(izquierda).
+
+decidir(girar_izquierda) :- pared(frente), libre(izquierda).
+decidir(avanzar) :- libre(frente).
+
+?- decidir(A).`,
   },
   {
     title: 'Miembro de una lista',
@@ -75,22 +84,9 @@ factorial(N, R) :- N > 0, N1 is N - 1, factorial(N1, R1), R is N * R1.
 ?- doble(5, R).
 ?- factorial(5, R).`,
   },
-  {
-    title: 'Ancestro / descendiente',
-    description: 'Recursividad con hechos y reglas',
-    code: `padre(abraham, isaac).
-padre(isaac, jacob).
-padre(jacob, juda).
-
-ancestro(X, Y) :- padre(X, Y).
-ancestro(X, Y) :- padre(X, Z), ancestro(Z, Y).
-
-?- ancestro(abraham, juda).
-?- ancestro(abraham, X).`,
-  },
 ];
 
-type Tab = 'result' | 'trace' | 'robot';
+type Tab = 'robot' | 'result' | 'trace';
 
 function TraceTreeView({ steps }: { steps: TraceStep[] }) {
   return (
@@ -128,25 +124,30 @@ function TraceTreeView({ steps }: { steps: TraceStep[] }) {
   );
 }
 
-const MOVIMIENTOS = ['avanzar', 'girar_izquierda', 'girar_derecha', 'retroceder', 'saltar'] as const;
-type Movimiento = (typeof MOVIMIENTOS)[number];
+const MOVIMIENTOS_VALIDOS = ['avanzar', 'girar_izquierda', 'girar_derecha', 'retroceder', 'saltar'] as const;
+
+function esMovimiento(texto: string): texto is Movimiento {
+  return (MOVIMIENTOS_VALIDOS as readonly string[]).includes(texto.toLowerCase());
+}
 
 function detectarMovimientos(result: PrologResult | null): Movimiento[] {
   if (!result || result.error) return [];
   const movs: Movimiento[] = [];
+  const vistos = new Set<string>();
+
   const revisar = (texto: string) => {
-    const lower = texto.toLowerCase();
-    MOVIMIENTOS.forEach((m) => {
-      if (lower.includes(m)) {
-        movs.push(m);
-      }
-    });
+    const lower = texto.toLowerCase().trim();
+    if (esMovimiento(lower) && !vistos.has(lower)) {
+      vistos.add(lower);
+      movs.push(lower as Movimiento);
+    }
   };
+
   if (result.answer) revisar(result.answer);
   result.solutions.forEach((sol) => {
     sol.forEach((v, k) => {
-      revisar(k);
       revisar(v);
+      revisar(k);
     });
   });
   return movs;
@@ -156,12 +157,14 @@ function App() {
   const [input, setInput] = useState<string>(EXAMPLES[0].code);
   const [result, setResult] = useState<PrologResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [tab, setTab] = useState<Tab>('result');
+  const [tab, setTab] = useState<Tab>('robot');
   const [allSolutions, setAllSolutions] = useState(false);
   const [showExamples, setShowExamples] = useState(true);
   const [copied, setCopied] = useState(false);
   const [robotMood, setRobotMood] = useState<RobotMood>('idle');
   const [robotSeq, setRobotSeq] = useState<Movimiento[]>([]);
+  const [currentMoveIndex, setCurrentMoveIndex] = useState(-1);
+  const [executing, setExecuting] = useState(false);
   const traceRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -170,33 +173,61 @@ function App() {
     }
   }, [tab, result]);
 
+  const ejecutarSecuencia = useCallback((movs: Movimiento[]) => {
+    if (movs.length === 0) return;
+    setExecuting(true);
+    setRobotMood('moving');
+    setCurrentMoveIndex(0);
+
+    let idx = 0;
+    const avanzarPaso = () => {
+      idx += 1;
+      if (idx < movs.length) {
+        setCurrentMoveIndex(idx);
+        setTimeout(avanzarPaso, MOVE_DURATION);
+      } else {
+        setTimeout(() => {
+          setExecuting(false);
+          setRobotMood('happy');
+          setCurrentMoveIndex(-1);
+          setTimeout(() => setRobotMood('idle'), 2500);
+        }, MOVE_DURATION);
+      }
+    };
+    setTimeout(avanzarPaso, MOVE_DURATION);
+  }, []);
+
   useEffect(() => {
     if (result) {
       const movs = detectarMovimientos(result);
       setRobotSeq(movs);
       if (result.error) {
         setRobotMood('error');
+        setTimeout(() => setRobotMood('idle'), 3000);
       } else if (movs.length > 0) {
-        setRobotMood('happy');
+        ejecutarSecuencia(movs);
       } else if (result.success) {
         setRobotMood('happy');
+        setTimeout(() => setRobotMood('idle'), 2500);
       } else {
         setRobotMood('sad');
+        setTimeout(() => setRobotMood('idle'), 3000);
       }
-      setTimeout(() => setRobotMood('idle'), 3000);
     }
-  }, [result]);
+  }, [result, ejecutarSecuencia]);
 
   const handleRun = useCallback(() => {
     setLoading(true);
     setTab('robot');
     setRobotMood('thinking');
     setRobotSeq([]);
+    setCurrentMoveIndex(-1);
+    setExecuting(false);
     setTimeout(() => {
       const res = runProlog(input, { allSolutions });
       setResult(res);
       setLoading(false);
-    }, 800);
+    }, 700);
   }, [input, allSolutions]);
 
   const handleExample = (ex: Example) => {
@@ -204,6 +235,8 @@ function App() {
     setResult(null);
     setRobotMood('idle');
     setRobotSeq([]);
+    setCurrentMoveIndex(-1);
+    setExecuting(false);
   };
 
   const handleCopyResult = () => {
@@ -227,13 +260,13 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-teal-500 flex items-center justify-center shadow-lg shadow-sky-500/20">
-              <Terminal className="w-5 h-5 text-white" />
+              <Bot className="w-5 h-5 text-white" />
             </div>
             <div>
               <h1 className="text-lg sm:text-xl font-bold tracking-tight">
                 Prolog<span className="text-sky-400">IA</span>
               </h1>
-              <p className="text-xs text-slate-500 hidden sm:block">Intérprete de Prolog con explicación paso a paso</p>
+              <p className="text-xs text-slate-500 hidden sm:block">Intérprete de Prolog con robot visual y explicación paso a paso</p>
             </div>
           </div>
           <a
@@ -289,7 +322,7 @@ function App() {
                   Código Prolog + Consulta
                 </span>
                 <button
-                  onClick={() => { setInput(''); setResult(null); setRobotMood('idle'); setRobotSeq([]); }}
+                  onClick={() => { setInput(''); setResult(null); setRobotMood('idle'); setRobotSeq([]); setCurrentMoveIndex(-1); setExecuting(false); }}
                   className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1 transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -321,11 +354,11 @@ function App() {
                 </label>
                 <button
                   onClick={handleRun}
-                  disabled={loading || !input.trim()}
+                  disabled={loading || !input.trim() || executing}
                   className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-teal-500 text-white text-sm font-medium shadow-lg shadow-sky-500/20 hover:shadow-sky-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-40 disabled:hover:scale-100 disabled:shadow-none"
                 >
                   <Play className="w-4 h-4" />
-                  Ejecutar
+                  {executing ? 'Ejecutando...' : 'Ejecutar'}
                 </button>
               </div>
             </div>
@@ -337,7 +370,7 @@ function App() {
             <div className="flex flex-col flex-1 rounded-2xl border border-slate-800 bg-slate-900/50 overflow-hidden">
               <div className="flex items-center gap-1 px-2 py-2 border-b border-slate-800 bg-slate-900/80">
                 {([
-                  { id: 'robot' as Tab, label: 'Robot', icon: Sparkles },
+                  { id: 'robot' as Tab, label: 'Robot', icon: Bot },
                   { id: 'result' as Tab, label: 'Respuesta', icon: CheckCircle2 },
                   { id: 'trace' as Tab, label: 'Traza', icon: Terminal },
                 ]).map((t) => (
@@ -369,30 +402,52 @@ function App() {
               <div className="flex-1 overflow-auto p-4 min-h-[300px] lg:min-h-0">
                 {/* Robot tab */}
                 {tab === 'robot' && (
-                  <div className="h-full flex flex-col items-center justify-center gap-6 py-4">
+                  <div className="h-full flex flex-col items-center justify-center gap-4 py-4">
                     <div className="robot-arena">
-                      <Robot mood={loading ? 'thinking' : robotMood} />
+                      <Robot
+                        mood={loading ? 'thinking' : robotMood}
+                        currentMoveIndex={currentMoveIndex}
+                        sequence={robotSeq}
+                      />
                     </div>
+
+                    {/* Movement sequence chips */}
                     {robotSeq.length > 0 && (
-                      <div className="flex flex-wrap justify-center gap-2 max-w-sm">
-                        {robotSeq.map((m, i) => (
-                          <span
-                            key={i}
-                            className="px-3 py-1 rounded-lg bg-sky-900/40 border border-sky-700/40 text-xs text-sky-200 font-mono animate-pop"
-                            style={{ animationDelay: `${i * 200}ms` }}
-                          >
-                            {m.replace('_', ' ')}
-                          </span>
-                        ))}
+                      <div className="flex flex-wrap justify-center gap-2 max-w-md">
+                        {robotSeq.map((m, i) => {
+                          const isActive = robotMood === 'moving' && i === currentMoveIndex;
+                          const isDone = robotMood === 'moving' && i < currentMoveIndex;
+                          return (
+                            <span
+                              key={i}
+                              className={`px-3 py-1.5 rounded-lg border text-xs font-mono animate-pop transition-all flex items-center gap-1.5 ${
+                                isActive
+                                  ? 'bg-sky-500/30 border-sky-400 text-sky-100 scale-110 shadow-lg shadow-sky-500/30'
+                                  : isDone
+                                  ? 'bg-emerald-900/30 border-emerald-700/40 text-emerald-300/70'
+                                  : 'bg-slate-800/40 border-slate-700/50 text-slate-400'
+                              }`}
+                              style={{ animationDelay: `${i * 80}ms` }}
+                            >
+                              <span className="text-sm">{moveIcon(m)}</span>
+                              {moveLabel(m)}
+                              {isDone && <Check className="w-3 h-3" />}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
+
                     {!loading && !result && (
-                      <p className="text-slate-500 text-sm text-center">
-                        Presiona <span className="text-sky-400 font-medium">Ejecutar</span> para ver al robot moverse.
+                      <p className="text-slate-500 text-sm text-center max-w-xs">
+                        Presiona <span className="text-sky-400 font-medium">Ejecutar</span> para ver al robot moverse según tu código Prolog.
                       </p>
                     )}
                     {loading && (
                       <p className="text-sky-300 text-sm animate-pulse">El robot está procesando...</p>
+                    )}
+                    {!loading && result && result.error && robotMood === 'idle' && (
+                      <p className="text-rose-400/80 text-sm text-center max-w-xs">El robot encontró un error en el código.</p>
                     )}
                   </div>
                 )}

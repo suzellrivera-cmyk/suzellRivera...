@@ -8,7 +8,7 @@
   align-items: flex-end;
   justify-content: center;
   width: 100%;
-  min-height: 340px;
+  min-height: 360px;
   position: relative;
   background:
     radial-gradient(ellipse at 50% 90%, rgba(56, 189, 248, 0.12), transparent 60%),
@@ -18,6 +18,7 @@
   overflow: hidden;
 }
 
+/* Ground line */
 .robot-arena::after {
   content: '';
   position: absolute;
@@ -44,6 +45,16 @@
   transform-origin: bottom;
 }
 
+/* Ambient floating particles */
+.robot-arena .particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.3);
+  animation: float-up 6s ease-in infinite;
+}
+
 /* ===== Robot stage ===== */
 .robot-stage {
   position: relative;
@@ -63,6 +74,28 @@
 .mood-sad .robot-stage,
 .mood-error .robot-stage {
   animation: robot-sag 2.5s ease-in-out infinite;
+}
+
+.mood-moving .robot-stage {
+  animation: none;
+}
+
+/* Movement transforms applied to whole stage */
+.mood-moving .robot-stage {
+  transition: transform 0.3s ease;
+}
+
+/* Avanzar: translate forward (up and slightly toward viewer) */
+.robot-stage.mood-moving {
+  animation: move-forward-back 1.2s ease-in-out;
+}
+
+/* We handle per-move via classes on children, but stage shift for avanzar/retroceder */
+@keyframes move-forward-back {
+  0% { transform: translateX(0) translateY(0); }
+  30% { transform: translateX(0) translateY(-6px); }
+  70% { transform: translateX(0) translateY(-6px); }
+  100% { transform: translateX(0) translateY(0); }
 }
 
 /* Antenna */
@@ -92,10 +125,10 @@
   background: #38bdf8;
   border-color: #7dd3fc;
   box-shadow: 0 0 14px rgba(56, 189, 248, 0.8), 0 0 28px rgba(56, 189, 248, 0.4);
-  animation: bulb-pulse 0.8s ease-in-out infinite;
+  animation: bulb-pulse-antenna 0.8s ease-in-out infinite;
 }
 
-.mood-error .robot-antenna-bulb {
+.robot-antenna-bulb.error-bulb {
   background: #f43f5e;
   border-color: #fb7185;
   box-shadow: 0 0 14px rgba(244, 63, 94, 0.8);
@@ -115,7 +148,7 @@
     inset 0 2px 4px rgba(255, 255, 255, 0.15),
     inset 0 -3px 6px rgba(0, 0, 0, 0.35),
     0 6px 14px rgba(0, 0, 0, 0.35);
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .robot-head.thinking {
@@ -128,6 +161,31 @@
 
 .robot-head.droop {
   transform: rotate(4deg) translateY(4px);
+}
+
+/* Move: head looks in direction */
+.robot-head.move-head {
+  transform: translateY(calc(-1 * var(--jump, 0px)));
+}
+
+.robot-head.turn-left {
+  animation: turn-left 1.2s ease-in-out;
+}
+
+.robot-head.turn-right {
+  animation: turn-right 1.2s ease-in-out;
+}
+
+@keyframes turn-left {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(-25deg); }
+  100% { transform: rotate(0deg); }
+}
+
+@keyframes turn-right {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(25deg); }
+  100% { transform: rotate(0deg); }
 }
 
 /* Eyes screen */
@@ -196,6 +254,15 @@
 }
 .robot-eye.happy-eye::after { display: none; }
 
+.robot-eye.move-eye {
+  background: linear-gradient(180deg, #0c4a6e, #082f49);
+  color: #7dd3fc;
+  font-size: 18px;
+  font-family: monospace;
+  line-height: 1;
+}
+.robot-eye.move-eye::after { display: none; }
+
 .eye-right::after {
   animation: eye-look-r 4s ease-in-out infinite;
 }
@@ -241,6 +308,20 @@
   transform: none;
 }
 
+.robot-mouth.mouth-move {
+  width: 24px;
+  height: 8px;
+  border-radius: 4px;
+  background: #0c4a6e;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 0 6px rgba(56, 189, 248, 0.3);
+  animation: mouth-talk 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes mouth-talk {
+  from { height: 4px; }
+  to { height: 10px; }
+}
+
 /* Ear bolts */
 .robot-bolt {
   position: absolute;
@@ -276,11 +357,15 @@
     inset 0 2px 4px rgba(255, 255, 255, 0.12),
     inset 0 -3px 6px rgba(0, 0, 0, 0.35),
     0 4px 10px rgba(0, 0, 0, 0.3);
-  transition: transform 0.4s ease;
+  transition: transform 0.3s ease;
 }
 
 .robot-body.celebrate {
   animation: body-wiggle 0.5s ease-in-out infinite;
+}
+
+.robot-body.move-body {
+  transform: translateY(calc(-1 * var(--jump, 0px)));
 }
 
 /* Chest gauge */
@@ -355,7 +440,7 @@
   background: linear-gradient(180deg, #64748b, #475569);
   border-radius: 7px;
   z-index: 1;
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .arm-left { left: calc(50% - 60px); }
 .arm-right { right: calc(50% - 60px); }
@@ -376,6 +461,13 @@
   transform: rotate(-20deg) translateY(6px);
 }
 
+.arm-jump-l {
+  transform: translateY(calc(-1 * var(--jump, 0px))) rotate(-15deg);
+}
+.arm-jump-r {
+  transform: translateY(calc(-1 * var(--jump, 0px))) rotate(15deg);
+}
+
 /* Base / tracks */
 .robot-base {
   width: 120px;
@@ -389,6 +481,7 @@
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
+  transition: transform 0.3s ease;
 }
 
 .robot-track {
@@ -414,6 +507,72 @@
     #475569 6px,
     #475569 12px
   );
+}
+
+.robot-track.track-reverse {
+  animation: track-move-reverse 0.4s linear infinite;
+}
+
+/* Movement label bubble */
+.move-bubble {
+  position: absolute;
+  top: -6px;
+  right: -100px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
+  z-index: 10;
+}
+
+.move-bubble::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 8px solid #0284c7;
+}
+
+.move-bubble-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.move-bubble-label {
+  font-family: system-ui, sans-serif;
+}
+
+/* Progress bar */
+.move-progress {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(51, 65, 85, 0.6);
+  overflow: hidden;
+}
+
+.move-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #38bdf8, #0ea5e9);
+  box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+  transition: width 0.05s linear;
 }
 
 /* ===== Animations ===== */
@@ -445,10 +604,6 @@
 @keyframes bulb-pulse {
   0%, 100% { opacity: 1; transform: translateX(-50%) scale(1); }
   50% { opacity: 0.6; transform: translateX(-50%) scale(0.82); }
-}
-
-.robot-antenna-bulb.glowing {
-  animation: bulb-pulse-antenna 0.8s ease-in-out infinite;
 }
 
 @keyframes bulb-pulse-antenna {
@@ -488,6 +643,18 @@
 @keyframes track-move {
   from { background-position: 0 0; }
   to { background-position: -12px 0; }
+}
+
+@keyframes track-move-reverse {
+  from { background-position: 0 0; }
+  to { background-position: 12px 0; }
+}
+
+@keyframes float-up {
+  0% { transform: translateY(0) scale(1); opacity: 0; }
+  10% { opacity: 0.8; }
+  90% { opacity: 0.3; }
+  100% { transform: translateY(-200px) scale(0.5); opacity: 0; }
 }
 
 @keyframes pop {
