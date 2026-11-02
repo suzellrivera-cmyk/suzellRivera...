@@ -666,3 +666,218 @@
 .animate-pop {
   animation: pop 0.5s ease-out backwards;
 }
+
+/* ===== Per-move animations ===== */
+
+/* avanzar: shift the whole stage forward and back */
+.anim-avanzar {
+  animation: move-forward 1.2s ease-in-out;
+}
+@keyframes move-forward {
+  0% { transform: translateY(0); }
+  30% { transform: translateY(-10px) scale(1.02); }
+  70% { transform: translateY(-10px) scale(1.02); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* retroceder: shift stage backward */
+.anim-retroceder {
+  animation: move-backward 1.2s ease-in-out;
+}
+@keyframes move-backward {
+  0% { transform: translateY(0); }
+  30% { transform: translateY(4px) scale(0.97); }
+  70% { transform: translateY(4px) scale(0.97); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* girar_izquierda: rotate stage left */
+.anim-girar_izquierda {
+  animation: rotate-left 1.2s ease-in-out;
+}
+@keyframes rotate-left {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(-30deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* girar_derecha: rotate stage right */
+.anim-girar_derecha {
+  animation: rotate-right 1.2s ease-in-out;
+}
+@keyframes rotate-right {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(30deg); }
+  100% { transform: rotate(0deg); }
+}
+
+/* girar_completo: full 360 spin */
+.anim-girar_completo {
+  animation: spin-full 1.2s ease-in-out;
+}
+@keyframes spin-full {
+  0% { transform: rotate(0deg) scale(1); }
+  20% { transform: rotate(0deg) scale(0.9); }
+  80% { transform: rotate(360deg) scale(0.9); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+/* saltar: whole stage jumps up */
+.anim-saltar {
+  animation: jump-up 1.2s ease-out;
+}
+@keyframes jump-up {
+  0% { transform: translateY(0); }
+  45% { transform: translateY(-50px); }
+  55% { transform: translateY(-50px); }
+  100% { transform: translateY(0); }
+}
+
+/* agacharse: stage squats down */
+.anim-agacharse {
+  animation: crouch 1.2s ease-in-out;
+}
+@keyframes crouch {
+  0% { transform: scaleY(1); }
+  40% { transform: scaleY(0.72) translateY(14px); }
+  60% { transform: scaleY(0.72) translateY(14px); }
+  100% { transform: scaleY(1); }
+}
+
+/* correr: rapid shake with fast tracks */
+.anim-correr {
+  animation: run-shake 0.3s ease-in-out infinite;
+}
+@keyframes run-shake {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-3px) rotate(-1deg); }
+  75% { transform: translateY(-3px) rotate(1deg); }
+}
+
+/* bailar: rhythmic sway + arms up */
+.anim-bailar {
+  animation: dance 0.5s ease-in-out infinite alternate;
+}
+@keyframes dance {
+  0% { transform: rotate(-6deg) translateY(-4px); }
+  100% { transform: rotate(6deg) translateY(-4px); }
+}
+
+/* detenerse: quick forward lurch then freeze */
+.anim-detenerse {
+  animation: brake 1.2s ease-out;
+}
+@keyframes brake {
+  0% { transform: translateY(0); }
+  15% { transform: translateY(-6px) scale(1.03); }
+  25% { transform: translateY(2px) scale(0.98); }
+  35% { transform: translateY(0) scale(1); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* inclinarse: tilt sideways */
+.anim-inclinarse {
+  animation: lean 1.2s ease-in-out;
+}
+@keyframes lean {
+  0% { transform: rotate(0deg); }
+  40% { transform: rotate(15deg) translateX(4px); }
+  60% { transform: rotate(15deg) translateX(4px); }
+  100% { transform: rotate(0deg) translateX(0); }
+}
+
+/* celebrar: hop with arms up */
+.anim-celebrar {
+  animation: celebrate 0.6s ease-in-out infinite alternate;
+}
+@keyframes celebrate {
+  0% { transform: translateY(0) rotate(-2deg); }
+  100% { transform: translateY(-12px) rotate(2deg); }
+}
+
+/* encender: quick scale up with bright glow */
+.anim-encender {
+  animation: power-on 1.2s ease-out;
+}
+@keyframes power-on {
+  0% { transform: scale(0.92); filter: brightness(0.6); }
+  30% { transform: scale(1.06); filter: brightness(1.4); }
+  60% { transform: scale(1.02); filter: brightness(1.2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+/* apagar: shrink and dim */
+.anim-apagar {
+  animation: power-off 1.2s ease-in;
+}
+@keyframes power-off {
+  0% { transform: scale(1); filter: brightness(1); }
+  50% { transform: scale(0.94); filter: brightness(0.4); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+/* arm celebrate (both up and waving) */
+.arm-celebrate-l {
+  animation: arm-celebrate-l 0.4s ease-in-out infinite alternate;
+}
+.arm-celebrate-r {
+  animation: arm-celebrate-r 0.4s ease-in-out infinite alternate;
+}
+@keyframes arm-celebrate-l {
+  0% { transform: rotate(-25deg); }
+  100% { transform: rotate(-50deg) translateY(-4px); }
+}
+@keyframes arm-celebrate-r {
+  0% { transform: rotate(25deg); }
+  100% { transform: rotate(50deg) translateY(-4px); }
+}
+
+/* spinning gear fast (correr) */
+.robot-gear.spinning-fast {
+  animation: gear-spin 0.25s linear infinite;
+}
+
+/* track fast (correr) */
+.robot-track.track-fast {
+  animation: track-move 0.15s linear infinite;
+}
+
+/* track brake (detenerse) */
+.robot-track.track-brake {
+  animation: track-brake 1.2s ease-out;
+}
+@keyframes track-brake {
+  0% { animation: track-move 0.15s linear infinite; }
+  30% { transform: skewX(-8deg); }
+  100% { transform: skewX(0deg); }
+}
+
+/* bulb off (apagar) */
+.robot-antenna-bulb.bulb-off {
+  background: #1e293b;
+  border-color: #334155;
+  box-shadow: none;
+  animation: none;
+}
+
+/* eye off (apagar) */
+.robot-eye.eye-off {
+  background: #0f172a;
+  border-color: #1e293b;
+}
+.robot-eye.eye-off::after {
+  display: none;
+}
+
+/* chest light states for encender/apagar */
+.robot-chest-light.super-bright {
+  background: #fde047;
+  box-shadow: 0 0 20px rgba(253, 224, 71, 0.9), 0 0 36px rgba(253, 224, 71, 0.5);
+  animation: bulb-pulse 0.5s ease-in-out infinite;
+}
+
+.robot-chest-light.light-off {
+  background: #1e293b;
+  box-shadow: none;
+  animation: none;
+}

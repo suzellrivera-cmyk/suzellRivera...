@@ -18,6 +18,13 @@ const EXAMPLES: Example[] = [
 ?- accion(avanzar).`,
   },
   {
+    title: 'Retroceder',
+    description: 'El robot retrocede',
+    code: `accion(retroceder).
+
+?- accion(retroceder).`,
+  },
+  {
     title: 'Girar a la derecha',
     description: 'El robot gira en su lugar',
     code: `accion(girar_derecha).
@@ -25,38 +32,98 @@ const EXAMPLES: Example[] = [
 ?- accion(girar_derecha).`,
   },
   {
-    title: 'Rutina de movimientos',
-    description: 'Secuencia: avanzar, girar, avanzar, saltar',
+    title: 'Giro completo 360',
+    description: 'El robot da una vuelta completa',
+    code: `accion(girar_completo).
+
+?- accion(girar_completo).`,
+  },
+  {
+    title: 'Saltar',
+    description: 'El robot salta en su lugar',
+    code: `accion(saltar).
+
+?- accion(saltar).`,
+  },
+  {
+    title: 'Agacharse',
+    description: 'El robot se agacha para esquivar',
+    code: `accion(agacharse).
+
+?- accion(agacharse).`,
+  },
+  {
+    title: 'Correr',
+    description: 'El robot corre a velocidad',
+    code: `accion(correr).
+
+?- accion(correr).`,
+  },
+  {
+    title: 'Bailar',
+    description: 'El robot baila celebrando',
+    code: `accion(bailar).
+
+?- accion(bailar).`,
+  },
+  {
+    title: 'Celebrar',
+    description: 'El robot levanta los brazos y celebra',
+    code: `accion(celebrar).
+
+?- accion(celebrar).`,
+  },
+  {
+    title: 'Inclinarse',
+    description: 'El robot se inclina a un lado',
+    code: `accion(inclinarse).
+
+?- accion(inclinarse).`,
+  },
+  {
+    title: 'Encender / Apagar',
+    description: 'El robot enciende y apaga sus luces',
+    code: `accion(encender).
+accion(apagar).
+
+?- accion(encender).
+?- accion(apagar).`,
+  },
+  {
+    title: 'Detenerse',
+    description: 'El robot frena bruscamente',
+    code: `accion(detenerse).
+
+?- accion(detenerse).`,
+  },
+  {
+    title: 'Rutina completa',
+    description: 'Secuencia de 8 movimientos distintos',
     code: `paso(1, avanzar).
 paso(2, girar_derecha).
-paso(3, avanzar).
+paso(3, correr).
 paso(4, saltar).
-paso(5, retroceder).
+paso(5, girar_izquierda).
+paso(6, agacharse).
+paso(7, bailar).
+paso(8, celebrar).
 
 rutina(N, P) :- paso(N, P).
 
 ?- rutina(N, P).`,
   },
   {
-    title: 'Saltar obstáculo',
-    description: 'El robot salta si encuentra un obstáculo',
-    code: `obstaculo(piedra).
-obstaculo(roca).
+    title: 'Evitar obstaculo',
+    description: 'El robot decide saltar, agacharse o girar',
+    code: `obstaculo(piedrolo, saltar).
+obstaculo(tunel, agacharse).
+obstaculo(pared, girar_izquierda).
 
-saltar(X) :- obstaculo(X).
+evitar(T, A) :- obstaculo(T, A).
 
-?- saltar(piedra).`,
-  },
-  {
-    title: 'Evitar pared',
-    description: 'El robot gira si hay una pared adelante',
-    code: `pared(frente).
-libre(izquierda).
-
-decidir(girar_izquierda) :- pared(frente), libre(izquierda).
-decidir(avanzar) :- libre(frente).
-
-?- decidir(A).`,
+?- evitar(piedrolo, A).
+?- evitar(tunel, A).
+?- evitar(pared, A).`,
   },
   {
     title: 'Miembro de una lista',
@@ -124,7 +191,22 @@ function TraceTreeView({ steps }: { steps: TraceStep[] }) {
   );
 }
 
-const MOVIMIENTOS_VALIDOS = ['avanzar', 'girar_izquierda', 'girar_derecha', 'retroceder', 'saltar'] as const;
+const MOVIMIENTOS_VALIDOS = [
+  'avanzar',
+  'girar_izquierda',
+  'girar_derecha',
+  'girar_completo',
+  'retroceder',
+  'saltar',
+  'bailar',
+  'agacharse',
+  'correr',
+  'detenerse',
+  'inclinarse',
+  'celebrar',
+  'encender',
+  'apagar',
+] as const;
 
 function esMovimiento(texto: string): texto is Movimiento {
   return (MOVIMIENTOS_VALIDOS as readonly string[]).includes(texto.toLowerCase());
